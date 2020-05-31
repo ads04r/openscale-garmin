@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from withings import WithingsAccount
+from openscalecsv import OpenScaleCSV
 from garmin import GarminConnect
 from fit import FitEncoder_Weight
 
@@ -12,14 +12,12 @@ from datetime import date
 from datetime import datetime
 import time
 import sys
+import os
 
-
-WITHINGS_USERNMAE = ''
-WITHINGS_PASSWORD = ''
-WITHINGS_SHORTNAME = ''
 
 GARMIN_USERNAME = ''
 GARMIN_PASSWORD = ''
+CSV_FILE = ''
 
 
 class DateOption(Option):
@@ -41,12 +39,8 @@ class DateOption(Option):
 def main():
     usage = 'usage: sync.py [options]'
     p = OptionParser(usage=usage, option_class=DateOption)
-    p.add_option('--withings-username', '--wu',
-                 default=WITHINGS_USERNMAE, metavar='<user>', help='username to login Withings Web Service.')
-    p.add_option('--withings-password', '--wp',
-                 default=WITHINGS_PASSWORD, metavar='<pass>', help='password to login Withings Web Service.')
-    p.add_option('--withings-shortname', '--ws',
-                 default=WITHINGS_SHORTNAME, metavar='<name>', help='your shortname used in Withings.')
+    p.add_option('--csv-file', '--csv',
+                 default=CSV_FILE, metavar='<file>', help='csv file exported from openScale.')
     p.add_option('--garmin-username', '--gu',
                  default=GARMIN_USERNAME, metavar='<user>', help='username to login Garmin Connect.')
     p.add_option('--garmin-password', '--gp',
@@ -60,8 +54,7 @@ def main():
     sync(**opts.__dict__)
 
 
-def sync(withings_username, withings_password, withings_shortname,
-         garmin_username, garmin_password,
+def sync(csv_file, garmin_username, garmin_password,
          fromdate, todate, no_upload, verbose):
 
     def verbose_print(s):
@@ -71,18 +64,27 @@ def sync(withings_username, withings_password, withings_shortname,
             else:
                 sys.stdout.write(s)
 
-    # Withings API
-    withings = WithingsAccount(withings_username, withings_password)
-    user = withings.get_user_by_shortname(withings_shortname)
-    if not user:
-        print 'could not find user: %s' % withings_shortname
-        return
-    if not user.ispublic:
-        print 'user %s has not opened withings data' % withings_shortname
-        return
+    if csv_file == '':
+        verbose_print("--csv_file is required\n")
+        exit(1)
+    if not(os.path.isfile(csv_file)):
+        verbose_print("File " + csv_file + " not found\n")
+        exit(1)
+
+    # OpenScale CSV
+    osc = OpenScaleCSV()
+    osc.load(csv_file)
     startdate = int(time.mktime(fromdate.timetuple()))
     enddate = int(time.mktime(todate.timetuple())) + 86399
-    groups = user.get_measure_groups(startdate=startdate, enddate=enddate)
+    groups = []
+    for ix in range(0, osc.records()):
+        item = osc.record(ix)
+        dt = int(time.mktime(item['dateTime'].timetuple()))
+        if dt < startdate:
+            continue
+        if dt > enddate:
+            continue
+        groups.append(item)
 
     # create fit file
     verbose_print('generating fit file...\n')
@@ -91,9 +93,9 @@ def sync(withings_username, withings_password, withings_shortname,
     fit.write_file_creator()
 
     for group in groups:
-        dt = group.get_datetime()
-        weight = group.get_weight()
-        fat_ratio = group.get_fat_ratio()
+        dt = group['dateTime']
+        weight = group['weight']
+        fat_ratio = group['fat']
         fit.write_device_info(timestamp=dt)
         fit.write_weight_scale(timestamp=dt, weight=weight, percent_fat=fat_ratio)
         verbose_print('appending weight scale record... %s %skg %s%%\n' % (dt, weight, fat_ratio))
@@ -114,4 +116,3 @@ def sync(withings_username, withings_password, withings_shortname,
 
 if __name__ == '__main__':
     main()
-

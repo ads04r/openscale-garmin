@@ -40,6 +40,10 @@ class OpenScaleCSV(object):
 						item[key] = value
 				self.items.append(item)
 
-	def dump(self):
+	def records(self):
 
-		return self.items
+		return len(self.items)
+
+	def record(self, ix):
+
+		return self.items[ix]
