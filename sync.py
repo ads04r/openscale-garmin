@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 from openscalecsv import OpenScaleCSV
-from garmin import GarminConnect
 from fit import FitEncoder_Weight
+from garmin_uploader.workflow import Workflow # pip install garmin-uploader
+from tempfile import mkstemp
 
 from optparse import OptionParser
 from optparse import Option
@@ -105,13 +106,17 @@ def sync(csv_file, garmin_username, garmin_password,
         sys.stdout.write(fit.getvalue())
         return
 
+    # create temporary file
+    fi, fn = mkstemp()
+    fn = fn + '.fit'
+    fp = open(fn, 'w')
+    fp.write(fit.getvalue())
+    fp.close()
+
     # garmin connect
-    garmin = GarminConnect()
-    garmin.login(garmin_username, garmin_password)
     verbose_print('attempting to upload fit file...\n')
-    r = garmin.upload_file(fit.getvalue())
-    if r:
-        verbose_print('weight.fit has been successfully uploaded!\n')
+    workflow = Workflow(paths=[fn], username=garmin_username, password=garmin_password)
+    workflow.run()
 
 
 if __name__ == '__main__':
