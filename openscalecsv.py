@@ -11,6 +11,10 @@ class OpenScaleCSV(object):
 	def __parsedate__(self, ds):
 
 		dsa = ds.replace(':', ' ').replace('/', ' ').replace('-', ' ').replace('.', ' ').replace('  ', ' ').split(' ')
+		if ((int(dsa[2]) > 31) & (int(dsa[0]) <= 31)):
+			tmp = dsa[0]
+			dsa[0] = dsa[2]
+			dsa[2] = tmp
 		while len(dsa) < 6:
 			dsa.append('0')
 		return datetime.datetime(int(dsa[0]), int(dsa[1]), int(dsa[2]), int(dsa[3]), int(dsa[4]), int(dsa[5]))
